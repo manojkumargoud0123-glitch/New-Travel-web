@@ -39,4 +39,5 @@ jobs:
           source: "dist/*" # 👈 only contents
           target: "/home/tggdevs/public_html/NewTravelWeb/"
           strip_components: 1 # 👈 removes dist folder
+          rm: true # 👈 empty the folder first, so no old files are left behind
 

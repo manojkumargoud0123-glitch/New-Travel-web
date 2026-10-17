@@ -1,0 +1,18 @@
+# Apache (cPanel) rules for the built app. Shipped with every deploy, since
+# the deploy empties the folder first.
+
+# The port-8008 Node server lives next to the site; don't let it be downloaded.
+<Files "serve.cjs">
+  Require all denied
+</Files>
+
+# Single-page app: any path that isn't a real file or folder (e.g. /dashboard
+# after a refresh) gets index.html, and React Router takes it from there.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
