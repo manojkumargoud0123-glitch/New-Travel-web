@@ -18,7 +18,17 @@ export const useAuth = () => useContext(AuthContext);
 // apiFetch() call. Requests carry `Authorization: Token <token>` (the `token`
 // returned by /Login/) plus the caller's username / role_id / role_name
 // (see ./userContext.js).
-export const API_BASE = "http://49.206.196.35:8030";
+export const API_ORIGIN = "https://49.206.196.35:8030";
+
+// Browsers won't let the live HTTPS site call the API directly: its
+// certificate is self-signed, so they don't trust it. So on HTTPS pages calls
+// go to /api on the same domain, where public/api/index.php forwards them to
+// API_ORIGIN. Plain-HTTP pages (localhost, port 8008) call the API directly,
+// which works only once that browser has accepted the certificate.
+export const API_BASE =
+  typeof window !== "undefined" && window.location.protocol === "https:"
+    ? "/api"
+    : API_ORIGIN;
 
 const TOKEN_KEY = "auth_token";
 

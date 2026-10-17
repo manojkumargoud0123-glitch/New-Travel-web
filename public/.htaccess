@@ -11,6 +11,17 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # PHP behind Apache can lose the Authorization header; keep it for the API
+  # pass-through.
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # /api/... → api/index.php, which forwards the call to the HTTP-only API
+  # (browsers won't let this HTTPS site call it directly).
+  RewriteRule ^api/index\.php$ - [L]
+  RewriteRule ^api/ api/index.php [L]
+
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

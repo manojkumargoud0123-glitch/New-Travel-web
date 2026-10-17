@@ -59,14 +59,19 @@ export function readUserContext(storage = globalThis.localStorage) {
   }
 }
 
+// Same-site paths ("/api/…", used on the HTTPS site) are resolved against a
+// stand-in origin and handed back as paths.
+const ABSOLUTE = /^([a-z][a-z\d+.-]*:|\/\/)/i;
+const STAND_IN = "http://relative.invalid";
+
 const addToQuery = (url, ctx) => {
   const hashAt = url.indexOf("#");
   const hash = hashAt >= 0 ? url.slice(hashAt) : "";
-  const u = new URL(hashAt >= 0 ? url.slice(0, hashAt) : url);
+  const u = new URL(hashAt >= 0 ? url.slice(0, hashAt) : url, STAND_IN);
   for (const [k, v] of Object.entries(ctx)) {
     if (!u.searchParams.has(k)) u.searchParams.set(k, String(v));
   }
-  return u.toString() + hash;
+  return (ABSOLUTE.test(url) ? u.toString() : u.pathname + u.search) + hash;
 };
 
 const QUERY_METHODS = ["GET", "HEAD", "DELETE"];
