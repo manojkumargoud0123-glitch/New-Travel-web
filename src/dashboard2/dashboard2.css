@@ -1,0 +1,22 @@
+/* Dashboard 2 colour tokens — RGB triples, read as rgb(var(--d2-x) / alpha).
+   The three trip-status steps were checked together for colour-blind
+   separation and contrast on each theme's panel surface, in the order
+   completed → active → cancelled (green and red never touch). Change them
+   as a set. */
+.d2 {
+  --d2-surface: 255 255 255;    /* #ffffff */
+  --d2-completed: 5 150 105;    /* #059669 */
+  --d2-active: 37 99 235;       /* #2563eb */
+  --d2-cancelled: 225 29 72;    /* #e11d48 */
+  --d2-other: 148 163 184;      /* #94a3b8 */
+  --d2-online: 5 150 105;       /* #059669 */
+}
+
+.dark .d2 {
+  --d2-surface: 18 20 35;       /* #121423 */
+  --d2-completed: 13 159 115;   /* #0d9f73 */
+  --d2-active: 59 130 246;      /* #3b82f6 */
+  --d2-cancelled: 244 63 94;    /* #f43f5e */
+  --d2-other: 100 116 139;      /* #64748b */
+  --d2-online: 13 159 115;      /* #0d9f73 */
+}

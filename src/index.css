@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   THEME COLORS  —  EDIT HERE TO RE-SKIN THE WHOLE APP
+   ----------------------------------------------------------------------------
+   The entire UI (buttons, links, active nav, focus rings, gradients, icons,
+   scrollbar, login/footer) is driven by the --primary-* variables below.
+   To change the app's accent color, replace these 11 values with any color
+   ramp (50 = lightest, 950 = darkest). Everything updates automatically.
+
+   Tip: generate a ramp at https://uicolors.app/create then paste the shades.
+
+   Defaults below are the original indigo theme.
+   ============================================================================ */
+:root {
+  /* --- primary accent ramp --- */
+  --primary-50:  #eef2ff;
+  --primary-100: #e0e7ff;
+  --primary-200: #c7d2fe;
+  --primary-300: #a5b4fc;
+  --primary-400: #818cf8;
+  --primary-500: #6366f1;
+  --primary-600: #4f46e5;
+  --primary-700: #4338ca;
+  --primary-800: #3730a3;
+  --primary-900: #312e81;
+  --primary-950: #1e1b4b;
+
+  /* --- secondary accent (used in login + footer gradients) --- */
+  --secondary-400: #2dd4bf;
+  --secondary-500: #14b8a6;
+
+  /* --- gradient stops for .text-gradient and brand gradients --- */
+  --gradient-from: var(--primary-400);
+  --gradient-via:  var(--primary-500);
+  --gradient-to:   var(--primary-600);
+
+  /* --- app backgrounds --- */
+  --bg-light: #f4f5fb;
+  --bg-dark:  #0a0b14;
+
+  color-scheme: dark;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+/* Theme tokens — light & dark */
+.dark body {
+  background: var(--bg-dark);
+}
+body {
+  background: var(--bg-light);
+}
+
+/* Custom scrollbar (driven by primary) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--primary-500) 35%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--primary-500) 60%, transparent);
+  background-clip: padding-box;
+}
+
+/* Gradient text helper (driven by primary) */
+.text-gradient {
+  background: linear-gradient(
+    120deg,
+    var(--gradient-from) 0%,
+    var(--gradient-via) 50%,
+    var(--gradient-to) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Subtle grain overlay */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.glass {
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Row highlight when the Alerts page is opened from a header notification click.
+   Blinks the target row a few times so the operator can spot it instantly. */
+@keyframes alertRowBlink {
+  0%,
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  20%,
+  60% {
+    background-color: color-mix(in srgb, #ef4444 24%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, #ef4444 60%, transparent);
+  }
+}
+.alert-row-blink {
+  animation: alertRowBlink 0.9s ease-in-out 10;
+  border-radius: 0.75rem;
+  -webkit-animation: alertRowBlink 0.9s ease-in-out 10;
+}
+

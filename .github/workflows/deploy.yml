@@ -1,0 +1,42 @@
+name: Deploy React (Vite) to GoDaddy cPanel (SFTP)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Vite app
+        run: npm run build
+
+      # Ship the small Node server too, so the app can also run on port 8008
+      # (start it on the server with: node serve.cjs)
+      - name: Add port-8008 server to the build
+        run: cp server/serve.cjs dist/serve.cjs
+
+      - name: Deploy via SFTP (GoDaddy)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          port: 22
+          source: "dist/*" # 👈 only contents
+          target: "/home/tggdevs/public_html/NewTravelWeb/"
+          strip_components: 1 # 👈 removes dist folder
+
