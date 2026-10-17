@@ -34,7 +34,17 @@ const TOKEN_KEY = "auth_token";
 
 const TAB_INACTIVE_LIMIT_MS = 3 * 60 * 60 * 1000; // 3 hours hidden → logout
 
-const authHeader = (token) => (token ? { Authorization: `Token ${token}` } : {});
+// The live server drops the Authorization header before the /api proxy sees
+// it, so through the proxy the token also travels as X-Authorization. Only
+// there: on direct calls the API's CORS rules don't allow that header.
+const VIA_PROXY = API_BASE === "/api";
+const authHeader = (token) =>
+  token
+    ? {
+        Authorization: `Token ${token}`,
+        ...(VIA_PROXY ? { "X-Authorization": `Token ${token}` } : {}),
+      }
+    : {};
 
 // localStorage keys that survive logout: per-user dashboard settings ("dash."),
 // light/dark choices ("theme", "theme.<username>") and the browser-local

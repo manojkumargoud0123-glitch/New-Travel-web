@@ -61,11 +61,14 @@ $url = UPSTREAM . $path . ($query ? '?' . $query : '');
 /* ---- request headers */
 $in = function_exists('getallheaders') ? getallheaders() : array();
 
-// Apache can hide Authorization from PHP; .htaccess copies it into the env
+// Apache can hide Authorization from PHP (it does on the live server), so
+// the app also sends the token as X-Authorization; .htaccess tries to copy
+// Authorization into the env as well.
 $auth = header_in($in, 'Authorization');
-foreach (array('HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION') as $k) {
+foreach (array('HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_AUTHORIZATION') as $k) {
     if (!$auth && !empty($_SERVER[$k])) $auth = $_SERVER[$k];
 }
+if (!$auth) $auth = header_in($in, 'X-Authorization');
 
 $accept = header_in($in, 'Accept');
 $out = array(
