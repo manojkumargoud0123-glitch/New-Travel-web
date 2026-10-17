@@ -462,12 +462,12 @@ export default function Navbar() {
             <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-white/90 dark:ring-white/10">
               <img
                 src="/logo.png"
-                alt="Srilalitha"
+                alt="TGG Travel"
                 className="h-full w-full object-contain"
               />
             </div>
             <span className="hidden font-display text-[16px] font-extrabold tracking-tight text-slate-900 dark:text-white sm:block">
-              AP <span className="text-gradient">102</span>
+              TGG <span className="text-gradient">Travel</span>
             </span>
           </div>
         </Link>
@@ -534,19 +534,7 @@ export default function Navbar() {
               transition={{ type: "spring", damping: 28, stiffness: 240 }}
               className="fixed inset-y-0 right-0 z-50 flex w-[300px] flex-col border-l border-slate-200 bg-white dark:border-white/[0.06] dark:bg-ink-900 xl:hidden"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/[0.06]">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-white/90 dark:ring-white/10">
-                    <img
-                      src="/lalitha-logo.png"
-                      alt="Srilalitha"
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                  <span className="font-display text-[16px] font-extrabold text-slate-900 dark:text-white">
-                    Srilalitha <span className="text-gradient">Rice Mill</span>
-                  </span>
-                </div>
+              <div className="flex items-center justify-end border-b border-slate-100 px-5 py-4 dark:border-white/[0.06]">
                 <button
                   onClick={() => setMobileOpen(false)}
                   className="text-slate-400"

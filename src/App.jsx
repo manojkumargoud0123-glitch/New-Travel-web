@@ -20,7 +20,6 @@ const VehicleBaseDistance = lazy(() => import("./pages/Reports/VehicleBaseDistan
 const Logout = lazy(() => import("./pages/Logout"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Dashboard2 = lazy(() => import("./pages/Dashboard2"));
 
 /* Guards ------------------------------------------------------------------ */
 // Wraps the whole app shell: if not authed, bounce to /login
@@ -63,7 +62,6 @@ function AppRoutes() {
 
           {/* Dashboard */}
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard-2" element={<Dashboard2 />} />
 
           {/* Trips */}
           <Route path="/trips/trip-details" element={<TripDetails />} />

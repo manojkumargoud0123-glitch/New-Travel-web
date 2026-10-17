@@ -60,7 +60,7 @@ const Footer = () => {
               />
             </span> */}
             <p className="text-[13px] font-bold tracking-tight text-slate-700 dark:text-slate-200">
-              © {year} AP 102. All rights reserved.
+              © {year} TGG Travel. All rights reserved.
             </p>
           </div>
 

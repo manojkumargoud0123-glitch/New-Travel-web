@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Gauge,
   Route as RouteIcon,
   Database,
   FileBarChart,
@@ -17,11 +16,6 @@ export const nav = [
     label: "Dashboard",
     icon: LayoutDashboard,
     to: "/dashboard",
-  },
-  {
-    label: "Dashboard 2",
-    icon: Gauge,
-    to: "/dashboard-2",
   },
   {
     label: "Trips",
