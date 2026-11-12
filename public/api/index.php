@@ -1,9 +1,8 @@
 <?php
 /* Pass-through to the Travel API.
 
-   Browsers won't let the HTTPS site call the API directly: it has no
-   certificate they trust (a self-signed development one for "localhost"),
-   and before that it spoke plain HTTP ("mixed content"). So on HTTPS the app
+   Browsers won't let the HTTPS site call the API directly: it speaks plain
+   HTTP ("mixed content"). So on HTTPS the app
    calls /api/<path> on its own domain (see public/.htaccess) and this script
    forwards the request (method, query string, body, Authorization,
    Content-Type, Accept) to the API and sends the answer back unchanged.
@@ -11,11 +10,10 @@
    Only the one API below can be reached through here. Keep it in step with
    API_ORIGIN in src/config/AuthContext.jsx. */
 
-const UPSTREAM = 'https://49.206.196.35:8030';
+const UPSTREAM = 'http://160.153.184.198:8003';
 
-// The API's certificate is self-signed, so it can't be verified. The address
-// above is fixed, so the check is skipped; set this to true once the API has
-// a real certificate.
+// Only applies if UPSTREAM is https://. Leave false while the API's
+// certificate is self-signed; set to true once it has a real one.
 const VERIFY_TLS = false;
 
 function fail($status, $message)
