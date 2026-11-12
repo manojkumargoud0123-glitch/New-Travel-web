@@ -13,7 +13,7 @@ import {
   Search, Calendar, Car, Layers, Plus, X, Inbox, Loader2, AlertTriangle,
   ChevronUp, ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   FileText, FileSpreadsheet, FileDown, Printer, MapPin, Flag, Map as MapIcon,
-  Phone, RotateCcw, History,
+  Phone, RotateCcw, History, Ban, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../../config/AuthContext";
 import SearchSelect from "../../components/SearchSelect";
@@ -21,24 +21,9 @@ import PageNumbers from "../../components/PageNumbers";
 import { exportCSV, exportExcel, exportPDF, exportPrint } from "../../utils/exportUtils";
 import TripCreation from "./TripCreation";
 import TripMapModal from "./TripMapModal";
-
-/* =========================================================================
-   ENDPOINTS (through apiFetch: token + username / role_id / role_name)
-   GET  /VehicleTypeNewFilter/          → { units: [{ id, vehicle_type_name }] }
-   GET  /VehiclesDropdownByType/?vehicle_type_new=<type id>
-                                        → { results: [{ unit_id, unit_name }] }
-        (without the param it lists every vehicle)
-   POST /TripList/ { vehicle_type, vehicle_number, from_date, to_date }
-                                        → { results: [trip, …] }
-        One row per trip: the latest leg of its reassign chain, earlier legs
-        under previous_trips. The API has no paging, search or sort, so all
-        three happen here in the browser (TanStack Table).
-   ========================================================================= */
-const EP = {
-  types: "/VehicleTypeNewFilter/",
-  vehicles: "/VehiclesDropdownByType/",
-  trips: "/TripList/",
-};
+import { CancelTripModal, CloseTripModal } from "./TripActions";
+// Endpoints and the shared fetch helpers are documented in tripApi.js
+import { EP, listOf, apiError, useVehicleTypes, useVehicles } from "./tripApi";
 
 /* =========================================================================
    THEME
@@ -129,6 +114,10 @@ const STATUSES = {
 };
 const STATUS_ORDER = Object.keys(STATUSES);
 
+// Trips in these states are finished: no Cancel / Close buttons
+const FINISHED = new Set(["completed", "closed", "cancelled", "reassigned"]);
+const isOpenTrip = (r) => !FINISHED.has(r.status);
+
 const titleCase = (s) =>
   String(s).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -200,18 +189,6 @@ function haversineKm(lat1, lng1, lat2, lng2) {
     Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lng2 - lng1) / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
-const listOf = (data, key) =>
-  Array.isArray(data?.[key]) ? data[key] : Array.isArray(data) ? data : [];
-
-const apiError = (res, data) =>
-  (typeof data?.message === "string" && data.message) ||
-  (typeof data?.detail === "string" && data.detail) ||
-  (typeof data?.error === "string" && data.error) ||
-  `Request failed (${res.status})`;
-
-const naturalSort = (a, b) =>
-  a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 // Every value in the trip (nested ones too) plus the dates as shown, lower-cased
 function searchText(value) {
@@ -564,12 +541,35 @@ const columns = [
     cell: ({ row, table }) => {
       const r = row.original;
       const open = row.getIsExpanded();
+      const { openMap, openCancel, openClose } = table.options.meta;
       return (
         <span className="flex items-center justify-end gap-1.5">
+          {isOpenTrip(r) && r.trip_no && (
+            <>
+              <button
+                type="button"
+                onClick={() => openClose(r)}
+                title="Close trip"
+                aria-label={`Close trip ${r.trip_no}`}
+                className={`h-8 w-8 ${ghostBtn} enabled:hover:!border-emerald-300 enabled:hover:!bg-emerald-50 enabled:hover:!text-emerald-600 dark:enabled:hover:!bg-emerald-500/10 dark:enabled:hover:!text-emerald-300`}
+              >
+                <CheckCircle2 size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => openCancel(r)}
+                title="Cancel or reassign trip"
+                aria-label={`Cancel or reassign trip ${r.trip_no}`}
+                className={`h-8 w-8 ${ghostBtn} enabled:hover:!border-rose-300 enabled:hover:!bg-rose-50 enabled:hover:!text-rose-600 dark:enabled:hover:!bg-rose-500/10 dark:enabled:hover:!text-rose-300`}
+              >
+                <Ban size={15} />
+              </button>
+            </>
+          )}
           <button
             type="button"
             disabled={!r.hasCoords}
-            onClick={() => table.options.meta.openMap(r)}
+            onClick={() => openMap(r)}
             title={r.hasCoords ? "View route on map" : "No coordinates for this trip"}
             aria-label={`View route on map for ${r.trip_no || "trip"}`}
             className={`h-8 w-8 ${ghostBtn}`}
@@ -604,7 +604,7 @@ const COLUMN_WIDTH = {
   start: "w-[112px]",
   created: "w-[124px]",
   status: "w-[118px]",
-  actions: "w-[92px] text-right",
+  actions: "w-[172px] text-right",
 };
 
 /* --------------------------------- Page ----------------------------------- */
@@ -615,11 +615,7 @@ export default function TripDetails() {
   /* ---- filters (sent to the API) ---- */
   const [form, setForm] = useState(defaultFilters);
   const [formError, setFormError] = useState("");
-  const [types, setTypes] = useState([]); // [{ id, name }]
-  const [typesError, setTypesError] = useState(false);
-  const [vehicles, setVehicles] = useState([]); // unit names
-  const [vehiclesLoading, setVehiclesLoading] = useState(true);
-  const [vehiclesError, setVehiclesError] = useState(false);
+  const { types, error: typesError } = useVehicleTypes();
 
   /* ---- data ---- */
   const [rows, setRows] = useState([]);
@@ -637,74 +633,36 @@ export default function TripDetails() {
 
   const [mapTrip, setMapTrip] = useState(null);
   const [isCreationOpen, setIsCreationOpen] = useState(false);
+  const [cancelTrip, setCancelTrip] = useState(null); // row being cancelled / reassigned
+  const [closeTrip, setCloseTrip] = useState(null); // row being closed
+  const [notice, setNotice] = useState(""); // success message after an action
 
   const typeId = useMemo(
     () => types.find((t) => t.name === form.typeName)?.id ?? null,
     [types, form.typeName],
   );
 
+  /* ---- vehicles for the chosen type (all vehicles when none) ---- */
+  const { vehicles: vehicleList, loading: vehiclesLoading, error: vehiclesError } = useVehicles(typeId);
+  const vehicles = useMemo(() => vehicleList.map((v) => v.name), [vehicleList]);
+
+  // a vehicle picked under another type no longer applies
+  useEffect(() => {
+    if (vehiclesLoading || vehiclesError) return;
+    setForm((f) => (f.vehicle && !vehicles.includes(f.vehicle) ? { ...f, vehicle: "" } : f));
+  }, [vehicles, vehiclesLoading, vehiclesError]);
+
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const toFirstPage = () => setPagination((p) => ({ ...p, pageIndex: 0 }));
 
-  /* ---- vehicle types (once) ---- */
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await apiFetch(EP.types);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(apiError(res, data));
-        if (!alive) return;
-        setTypes(
-          listOf(data, "units")
-            .map((u) => ({ id: u.id, name: u.vehicle_type_name }))
-            .filter((t) => t.id != null && t.name),
-        );
-        setTypesError(false);
-      } catch {
-        if (alive) setTypesError(true);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [apiFetch]);
-
-  /* ---- vehicles for the chosen type (all vehicles when none) ---- */
-  useEffect(() => {
-    let alive = true;
-    setVehiclesLoading(true);
-    (async () => {
-      try {
-        const qs = typeId != null ? `?vehicle_type_new=${encodeURIComponent(typeId)}` : "";
-        const res = await apiFetch(`${EP.vehicles}${qs}`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(apiError(res, data));
-        if (!alive) return;
-        const names = [...new Set(listOf(data, "results").map((v) => v.unit_name).filter(Boolean))].sort(naturalSort);
-        setVehicles(names);
-        setVehiclesError(false);
-        // a vehicle picked under another type no longer applies
-        setForm((f) => (f.vehicle && !names.includes(f.vehicle) ? { ...f, vehicle: "" } : f));
-      } catch {
-        if (!alive) return;
-        setVehicles([]);
-        setVehiclesError(true);
-      } finally {
-        if (alive) setVehiclesLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [apiFetch, typeId]);
-
-  /* ---- trips ---- */
+  /* ---- trips ----
+     `quiet` (after a create / cancel / close): keep the current rows, page
+     and open details on screen while the list refreshes. */
   const loadTrips = useCallback(
-    async (f) => {
+    async (f, { quiet = false } = {}) => {
       const id = ++requestRef.current;
       appliedRef.current = f;
-      setLoading(true);
+      if (!quiet) setLoading(true);
       setFetchError("");
       try {
         const res = await apiFetch(EP.trips, {
@@ -731,8 +689,10 @@ export default function TripDetails() {
       } finally {
         if (id === requestRef.current) {
           setLoading(false);
-          setExpanded({});
-          toFirstPage();
+          if (!quiet) {
+            setExpanded({});
+            toFirstPage();
+          }
         }
       }
     },
@@ -802,7 +762,11 @@ export default function TripDetails() {
       globalFilter: query.trim(),
       columnVisibility: HIDDEN_COLUMNS,
     },
-    meta: { openMap: (r) => setMapTrip(toMapTrip(r)) },
+    meta: {
+      openMap: (r) => setMapTrip(toMapTrip(r)),
+      openCancel: setCancelTrip,
+      openClose: setCloseTrip,
+    },
     defaultColumn: { enableGlobalFilter: false, sortUndefined: "last" },
     globalFilterFn: "includesString",
     sortDescFirst: false, // first click ascending, then it alternates
@@ -829,6 +793,11 @@ export default function TripDetails() {
   const visibleColumns = table.getVisibleLeafColumns().length;
   const goTo = (p) => table.setPageIndex(Math.min(Math.max(p, 1), pageCount) - 1);
 
+  // A quiet refresh can leave fewer pages (e.g. a cancelled trip leaves its status tab)
+  useEffect(() => {
+    if (pagination.pageIndex > pageCount - 1) setPagination((p) => ({ ...p, pageIndex: pageCount - 1 }));
+  }, [pageCount, pagination.pageIndex]);
+
   const runExport = (label) => {
     const out = matched.map((r) => toExportRow(r.original));
     if (label === "CSV") exportCSV(out, EXPORT_COLUMNS, EXPORT_NAME);
@@ -847,10 +816,26 @@ export default function TripDetails() {
     return () => ctx.revert();
   }, []);
 
-  const closeCreation = () => {
+  /* ---- create / cancel / close ---- */
+  // The API accepted the change: close its dialog, say so, refresh the list
+  const afterAction = (message) => {
     setIsCreationOpen(false);
-    loadTrips(appliedRef.current); // a trip may have been added
+    setCancelTrip(null);
+    setCloseTrip(null);
+    setNotice(message);
+    loadTrips(appliedRef.current, { quiet: true });
   };
+
+  const afterCreate = (message) => {
+    afterAction(message);
+    toFirstPage(); // newest trips sort to the top
+  };
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const t = setTimeout(() => setNotice(""), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const searching = query.trim() !== "" || statusTab !== "all";
 
@@ -964,6 +949,31 @@ export default function TripDetails() {
           </p>
         )}
       </form>
+
+      {/* result of the last create / cancel / close */}
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            role="status"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="mb-5 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-400/20 dark:bg-emerald-500/10"
+          >
+            <CheckCircle2 size={17} className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <p className="flex-1 text-[13.5px] font-semibold text-emerald-700 dark:text-emerald-300">{notice}</p>
+            <button
+              type="button"
+              onClick={() => setNotice("")}
+              title="Dismiss"
+              aria-label="Dismiss"
+              className="shrink-0 cursor-pointer rounded-md p-0.5 text-emerald-500 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-500/20"
+            >
+              <X size={15} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* table card */}
       <div className={`td-bar ${card} overflow-visible`}>
@@ -1172,6 +1182,15 @@ export default function TripDetails() {
 
       {mapTrip && <TripMapModal trip={mapTrip} onClose={() => setMapTrip(null)} />}
 
+      <AnimatePresence>
+        {cancelTrip && (
+          <CancelTripModal key="cancel" trip={cancelTrip} onClose={() => setCancelTrip(null)} onDone={afterAction} />
+        )}
+        {closeTrip && (
+          <CloseTripModal key="close" trip={closeTrip} onClose={() => setCloseTrip(null)} onDone={afterAction} />
+        )}
+      </AnimatePresence>
+
       {/* creation modal */}
       <AnimatePresence>
         {isCreationOpen && (
@@ -1185,14 +1204,19 @@ export default function TripDetails() {
               className="relative flex h-full max-h-[90vh] w-full max-w-[1300px] flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-2xl ring-1 ring-black/5 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-slate-900/90"
             >
               <div className="flex items-center justify-between border-b border-slate-200/60 px-6 py-4 dark:border-white/[0.08]">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-primary-500" />
-                  <h2 className="text-[15px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Dispatch Operations</h2>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15 dark:text-primary-400">
+                    <Plus size={20} />
+                  </span>
+                  <div>
+                    <h2 className="font-display text-[18px] font-bold text-slate-900 dark:text-white">Create Trip</h2>
+                    <p className="text-[12.5px] text-slate-500 dark:text-slate-400">Assign a vehicle and set the pickup and drop.</p>
+                  </div>
                 </div>
                 <motion.button
                   whileHover={{ scale: 1.08, rotate: 90 }}
                   whileTap={{ scale: 0.92 }}
-                  onClick={closeCreation}
+                  onClick={() => setIsCreationOpen(false)}
                   aria-label="Close"
                   className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition-colors hover:bg-rose-100 hover:text-rose-600 dark:bg-white/[0.05] dark:text-slate-400 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
                 >
@@ -1200,7 +1224,7 @@ export default function TripDetails() {
                 </motion.button>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <TripCreation onClose={closeCreation} />
+                <TripCreation onCreated={afterCreate} onCancel={() => setIsCreationOpen(false)} />
               </div>
             </motion.div>
           </div>
