@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../config/AuthContext";
 
 /* =========================================================================
-   TRAVEL API — shared by Trip Details, the Create Trip form and the
-   Cancel / Close dialogs (all through apiFetch: token + username / role_id /
-   role_name).
+   TRAVEL API — shared by Trip Details, the Create Trip form, the
+   Cancel / Close dialogs and the Vehicle Type master (all through apiFetch:
+   token + username / role_id / role_name).
 
    GET  /VehicleTypeNewFilter/          → { units: [{ id, vehicle_type_name }] }
+   POST /VehicleTypeADD/ { add_vehicle_type }
+   POST /VehicleTypeEDIT/ { vehicle_type_id, add_vehicle_type }
+        (there is no delete)
    GET  /VehiclesDropdownByType/?vehicle_type_new=<type id>
                                         → { results: [{ unit_id, unit_name }] }
         (without the param it lists every vehicle)
@@ -28,7 +31,9 @@ import { useAuth } from "../../config/AuthContext";
    ========================================================================= */
 export const EP = {
   types: "/VehicleTypeNewFilter/",
-  vehicles: "/VehiclesDropdownByType/",
+  typeAdd: "/VehicleTypeADD/",
+  typeEdit: "/VehicleTypeEDIT/",
+  vehicles:"/VehiclesDropdownByType/",
   trips: "/TripList/",
   create: "/TripCreate/",
   cancel: "/TripCancel/",
@@ -71,7 +76,7 @@ export async function postJson(apiFetch, path, body) {
   try {
     const res = await apiFetch(path, { method: "POST", body });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data?.status !== "error") return { ok: true, data };
+    if (res.ok && data?.status !== "error" && data?.success !== false) return { ok: true, data };
     return { ok: false, error: apiError(res, data), fields: fieldErrors(data) };
   } catch (e) {
     return { ok: false, error: networkError(e), fields: {} };
@@ -95,13 +100,17 @@ export function splitErrors({ error, fields = {} }, formFields) {
   return { inline, banner };
 }
 
-/* Vehicle types: { types: [{ id, name }], loading, error } */
+/* Vehicle types: { types: [{ id, name }], loading, error, reload }.
+   reload() fetches again; the current list stays until the new one arrives. */
 export function useVehicleTypes() {
   const { apiFetch } = useAuth();
   const [state, setState] = useState({ types: [], loading: true, error: false });
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     let alive = true;
+    setState((s) => (s.loading ? s : { ...s, loading: true }));
     (async () => {
       try {
         const res = await apiFetch(EP.types);
@@ -119,9 +128,9 @@ export function useVehicleTypes() {
     return () => {
       alive = false;
     };
-  }, [apiFetch]);
+  }, [apiFetch, version]);
 
-  return state;
+  return { ...state, reload };
 }
 
 /* Vehicles of one type, every vehicle when typeId is null, none while
